@@ -1,6 +1,9 @@
-import network, socket
+import network
+import socket
 from machine import UART
-import micropython, esp, uos
+import micropython
+import esp
+import uos
 import time
 
 
@@ -9,25 +12,39 @@ class Interrupt(object):
         self._startTime = time.time()
 
     def __exit__(self, type, value, traceback):
-        print("Elapsed time: {:.3f} sec".format(time.time() - self._startTime))
+        elapsed_time = "Elapsed time: {:.3f} sec".format(time.time() - self._startTime)
+        send_strings(elapsed_time, UDPClientSocket, UDP_IP, serverPort)
 
 
-def read_and_send(comport, msg, sock, ip, port):
-    comport.write(msg)
+def read_and_send(comport, request, length):
+    lst = []
+    comport.write(request)
+    time.sleep(0.25)
     data = comport.read(5)  # кол-во принимаемых платой байт
-    bytes4.append(data[4])
-    bytes3.append(data[3])
-    if not data:
-        noneData.append(b'None')
-    if len(bytes3) == 10:
-        sent_to_host()
+    lst.append(data)
+    if len(lst) == length:
+        for i in range(length):
+            send_bytes2(lst[i], UDPClientSocket, UDP_IP, serverPort)
+            # if i == length-1:
+            #     lst.clear()
+            #     text_to_send = 'Package sent'
+            #     send_strings(text_to_send, UDPClientSocket, UDP_IP, serverPort)
 
-def sent_to_host(socket,data):
-    #посылаем данные на компик
-    sock.sendto(bytes4, (ip, port))
-    sock.sendto(bytes3, (ip, port))
-    sock.sendto(noneData, (ip, port))
-    return
+
+def send_strings(string, sock, ip, port):
+    return sock.sendto(bytes(string, "utf-8"), (ip, port))
+
+
+def send_bytes(comport, request, sock, ip, port):
+    comport.write(request)
+    time.sleep(2)
+    answer = comport.read()
+    sock.sendto(answer, (ip, port))
+
+
+def send_bytes2(data, sock, ip, port):
+    return sock.sendto(data, (ip, port))
+
 
 # старый вариант функции
 # def read_and_send(comport, msg, sock, ip, port):
@@ -81,45 +98,56 @@ micropython.alloc_emergency_exception_buf(100)  # for interrupt
 answer1 = uart.read()  # чтение данных из входного буфера микроконтроллера и его очистка
 # UDPClientSocket.sendto(answer1, (UDP_IP, serverPort))
 
-uart.write(b'\x55\x95\x0D')  # инициализация датчика /цепочки датчиков
-time.sleep(2)  # ждем ответа от датчика, с запасом
-answer2 = uart.read()
-UDPClientSocket.sendto(answer2, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x08\xA0\x01\x00')  # EEPROM unlock
-time.sleep(2)
-answer3 = uart.read()
-# UDPClientSocket.sendto(answer3, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x0A\xA0')  # check EEPROM unlock state
-time.sleep(2)
-answer4 = uart.read()
-UDPClientSocket.sendto(answer4, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x08\xA1\x00\x20')  # изменение регистра конфигурации (принимаем fd=20)
-time.sleep(2)
-answer5 = uart.read()
-# UDPClientSocket.sendto(answer5, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x0A\xA1')  # check EEPROM conversion rate
-time.sleep(2)
-answer6 = uart.read()
-UDPClientSocket.sendto(answer6, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x08\xA0\x00\x00')  # EEPROM lock
-time.sleep(2)
-answer7 = uart.read()
-# UDPClientSocket.sendto(answer7, (UDP_IP, serverPort))
-
-uart.write(b'\x55\x0A\xA0')  # check EEPROM lock state
-time.sleep(2)
-answer8 = uart.read()
-UDPClientSocket.sendto(answer8, (UDP_IP, serverPort))
-
-
-bytes4 = []
-bytes3 = []
-noneData = []
+send_bytes(uart, b'\x55\x95\x0D', UDPClientSocket, UDP_IP, serverPort)  # initialization the sensor
+send_bytes(uart, b'\x55\x08\xA0\x01\x00', UDPClientSocket, UDP_IP, serverPort)  # EEPROM unlock
+send_bytes(uart, b'\x55\x0A\xA0', UDPClientSocket, UDP_IP, serverPort)  # check EEPROM unlock state
+send_bytes(uart, b'\x55\x08\xA1\x00\x20', UDPClientSocket, UDP_IP, serverPort)  # изменение регистра
+# конфигурации (принимаем fd=20)
+send_bytes(uart, b'\x55\x08\xA0\x00\x00', UDPClientSocket, UDP_IP, serverPort)  # EEPROM lock
+send_bytes(uart, b'\x55\x0A\xA1', UDPClientSocket, UDP_IP, serverPort)  # check EEPROM conversion rate
 with Interrupt():
-    while True:
-        read_and_send(uart, b'\x55\x0A\xA0', UDPClientSocket, UDP_IP, serverPort)
+    send_bytes(uart, b'\x55\x0A\xA0', UDPClientSocket, UDP_IP, serverPort)  # check EEPROM lock state
+
+
+# uart.write(b'\x55\x95\x0D')  # инициализация датчика /цепочки датчиков
+# time.sleep(2)  # ждем ответа от датчика, с запасом
+# answer2 = uart.read()
+# UDPClientSocket.sendto(answer2, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x08\xA0\x01\x00')  # EEPROM unlock
+# time.sleep(2)
+# answer3 = uart.read()
+# # UDPClientSocket.sendto(answer3, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x0A\xA0')  # check EEPROM unlock state
+# time.sleep(2)
+# answer4 = uart.read()
+# UDPClientSocket.sendto(answer4, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x08\xA1\x00\x20')  # изменение регистра конфигурации (принимаем fd=20)
+# time.sleep(2)
+# answer5 = uart.read()
+# # UDPClientSocket.sendto(answer5, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x0A\xA1')  # check EEPROM conversion rate
+# time.sleep(2)
+# answer6 = uart.read()
+# UDPClientSocket.sendto(answer6, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x08\xA0\x00\x00')  # EEPROM lock
+# time.sleep(2)
+# answer7 = uart.read()
+# # UDPClientSocket.sendto(answer7, (UDP_IP, serverPort))
+#
+# uart.write(b'\x55\x0A\xA0')  # check EEPROM lock state
+# time.sleep(2)
+# answer8 = uart.read()
+# UDPClientSocket.sendto(answer8, (UDP_IP, serverPort))
+
+
+# while True:
+#     read_and_send(uart, b'\x55\x0A\xA0', UDPClientSocket, UDP_IP, serverPort)
+
+
+while True:
+    read_and_send(uart, b'\x55\x0A\xA0', 5)
