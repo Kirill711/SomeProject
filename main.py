@@ -1,6 +1,6 @@
 import network
 import socket
-from machine import UART
+from machine import UART, disable_irq, enable_irq
 import micropython
 import esp
 import uos
@@ -16,19 +16,20 @@ class Interrupt(object):
         send_strings(elapsed_time, UDPClientSocket, UDP_IP, serverPort)
 
 
-def read_and_send(comport, request, length):
-    lst = []
+def read_and_send(comport, request, lst, len_lst):
     comport.write(request)
     time.sleep(0.25)
     data = comport.read(5)  # кол-во принимаемых платой байт
     lst.append(data)
-    if len(lst) == length:
-        for i in range(length):
+    if len(lst) == len_lst:
+        # irq_state = disable_irq()  # start of critical section
+        for i in range(len_lst):
             send_bytes2(lst[i], UDPClientSocket, UDP_IP, serverPort)
-            # if i == length-1:
-            #     lst.clear()
-            #     text_to_send = 'Package sent'
-            #     send_strings(text_to_send, UDPClientSocket, UDP_IP, serverPort)
+            if i == len_lst-1:
+                lst.clear()
+                text_to_send = 'Package sent'
+                send_strings(text_to_send, UDPClientSocket, UDP_IP, serverPort)
+                # enable_irq(irq_state)  # end of critical section
 
 
 def send_strings(string, sock, ip, port):
@@ -148,6 +149,6 @@ with Interrupt():
 # while True:
 #     read_and_send(uart, b'\x55\x0A\xA0', UDPClientSocket, UDP_IP, serverPort)
 
-
+buffer = []
 while True:
-    read_and_send(uart, b'\x55\x0A\xA0', 5)
+    read_and_send(uart, b'\x55\x0A\xA0', buffer, 10)
