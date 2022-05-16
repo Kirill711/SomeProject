@@ -1,2 +1,2 @@
-# SomeFuckingShit
-Some fucking diploma code
+# SomeProject
+Some project code
